@@ -81,7 +81,7 @@
 		<module>dev-helper</module>
 		<module>ddd-akka-cluster-core</module>
 		<module>ddd-akka-cluster-toolset</module>
-		<module>ddd-akka-event-publisher2</module>
+		<module>ddd-akka-event-publisher</module>
 		<module>ddd-akka-event-publisher-mongodb</module>
 		<module>ddd-akka-event-publisher-mysql</module>
 		<module>ddd-akka-event-publisher-mongodb-sync</module>
