@@ -3,10 +3,11 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-parent</artifactId>
   <versioning>
-    <release>0.0.1</release>
+    <release>0.0.1-RELEASE</release>
     <versions>
       <version>0.0.1</version>
+      <version>0.0.1-RELEASE</version>
     </versions>
-    <lastUpdated>20230926074025</lastUpdated>
+    <lastUpdated>20230926075548</lastUpdated>
   </versioning>
 </metadata>

@@ -3,9 +3,11 @@
   <groupId>com.zero</groupId>
   <artifactId>dev-helper</artifactId>
   <versioning>
+    <release>0.0.1-RELEASE</release>
     <versions>
       <version>0.0.1-SNAPSHOT</version>
+      <version>0.0.1-RELEASE</version>
     </versions>
-    <lastUpdated>20230926074004</lastUpdated>
+    <lastUpdated>20230926075555</lastUpdated>
   </versioning>
 </metadata>

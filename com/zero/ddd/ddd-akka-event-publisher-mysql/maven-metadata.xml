@@ -3,9 +3,11 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-event-publisher-mysql</artifactId>
   <versioning>
+    <release>0.0.1-RELEASE</release>
     <versions>
       <version>0.0.1-SNAPSHOT</version>
+      <version>0.0.1-RELEASE</version>
     </versions>
-    <lastUpdated>20230926074024</lastUpdated>
+    <lastUpdated>20230926075611</lastUpdated>
   </versioning>
 </metadata>
