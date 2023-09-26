@@ -5,6 +5,7 @@
   <version>0.0.1-SNAPSHOT</version>
   <versioning>
     <snapshot>
+<<<<<<< HEAD
       <timestamp>20230926.073023</timestamp>
       <buildNumber>1</buildNumber>
     </snapshot>
@@ -19,6 +20,22 @@
         <extension>pom</extension>
         <value>0.0.1-20230926.073023-1</value>
         <updated>20230926073023</updated>
+=======
+      <timestamp>20230926.073839</timestamp>
+      <buildNumber>2</buildNumber>
+    </snapshot>
+    <lastUpdated>20230926073839</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>0.0.1-20230926.073839-2</value>
+        <updated>20230926073839</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>0.0.1-20230926.073839-2</value>
+        <updated>20230926073839</updated>
+>>>>>>> release
       </snapshotVersion>
     </snapshotVersions>
   </versioning>

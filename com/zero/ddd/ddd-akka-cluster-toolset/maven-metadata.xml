@@ -6,6 +6,10 @@
     <versions>
       <version>0.0.1-SNAPSHOT</version>
     </versions>
+<<<<<<< HEAD
     <lastUpdated>20230926073018</lastUpdated>
+=======
+    <lastUpdated>20230926073833</lastUpdated>
+>>>>>>> release
   </versioning>
 </metadata>
