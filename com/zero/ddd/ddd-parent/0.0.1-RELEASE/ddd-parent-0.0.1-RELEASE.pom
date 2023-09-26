@@ -87,18 +87,4 @@
 		<module>ddd-akka-event-publisher-mongodb-sync</module>
 	</modules>
 
-	<!--发布到私服配置 -->
-	<distributionManagement>
-		<repository>
-			<id>releases</id>
-			<name>Internal Release</name>
-			<url>http://39.96.117.179:8180/nexus-2.14.5-02/content/repositories/releases</url>
-		</repository>
-		<snapshotRepository>
-			<id>snapshots</id>
-			<name>Internal Snapshots</name>
-			<url>http://39.96.117.179:8180/nexus-2.14.5-02/content/repositories/snapshots</url>
-		</snapshotRepository>
-	</distributionManagement>
-
 </project>
