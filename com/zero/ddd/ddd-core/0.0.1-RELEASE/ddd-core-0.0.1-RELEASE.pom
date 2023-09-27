@@ -4,24 +4,29 @@
 	xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
-	
+
 	<parent>
 		<groupId>com.zero.ddd</groupId>
 		<artifactId>ddd-parent</artifactId>
 		<version>0.0.1-RELEASE</version>
 	</parent>
-	
+
 	<artifactId>ddd-core</artifactId>
 	<name>ddd-core</name>
-	
+
 	<url>http://maven.apache.org</url>
-	
+
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<java.version>1.8</java.version>
 	</properties>
 
 	<dependencies>
+		<dependency>
+			<groupId>org.glassfish</groupId>
+			<artifactId>javax.el</artifactId>
+			<version>3.0.0</version>
+		</dependency>
 		<dependency>
 			<groupId>com.zero</groupId>
 			<artifactId>dev-helper</artifactId>

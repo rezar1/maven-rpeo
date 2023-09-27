@@ -85,6 +85,7 @@
 		<module>ddd-akka-event-publisher-mongodb</module>
 		<module>ddd-akka-event-publisher-mysql</module>
 		<module>ddd-akka-event-publisher-mongodb-sync</module>
+		<module>ddd-akka-event-publisher-demo</module>
 	</modules>
 
 </project>
