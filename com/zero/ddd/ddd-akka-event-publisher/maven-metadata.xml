@@ -3,10 +3,17 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-event-publisher</artifactId>
   <versioning>
+<<<<<<< HEAD
     <release>0.0.1-RELEASE</release>
     <versions>
       <version>0.0.1-RELEASE</version>
     </versions>
     <lastUpdated>20230927082118</lastUpdated>
+=======
+    <versions>
+      <version>0.0.2-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20231012121921</lastUpdated>
+>>>>>>> snapshot
   </versioning>
 </metadata>

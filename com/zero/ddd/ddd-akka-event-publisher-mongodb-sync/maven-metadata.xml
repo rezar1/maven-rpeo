@@ -3,11 +3,18 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-event-publisher-mongodb-sync</artifactId>
   <versioning>
+<<<<<<< HEAD
     <release>0.0.1-RELEASE</release>
     <versions>
       <version>0.0.1-SNAPSHOT</version>
       <version>0.0.1-RELEASE</version>
     </versions>
     <lastUpdated>20230927082122</lastUpdated>
+=======
+    <versions>
+      <version>0.0.2-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20231012121927</lastUpdated>
+>>>>>>> snapshot
   </versioning>
 </metadata>
