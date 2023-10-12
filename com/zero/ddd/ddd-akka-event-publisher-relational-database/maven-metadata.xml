@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.zero.ddd</groupId>
+  <artifactId>ddd-akka-event-publisher-relational-database</artifactId>
+  <versioning>
+    <release>0.0.2-RELEASE</release>
+    <versions>
+      <version>0.0.2-RELEASE</version>
+    </versions>
+    <lastUpdated>20231012124117</lastUpdated>
+  </versioning>
+</metadata>
