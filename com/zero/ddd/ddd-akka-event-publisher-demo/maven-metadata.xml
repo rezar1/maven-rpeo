@@ -13,7 +13,11 @@
     <versions>
       <version>0.0.2-SNAPSHOT</version>
     </versions>
+<<<<<<< HEAD
     <lastUpdated>20231012121925</lastUpdated>
+>>>>>>> snapshot
+=======
+    <lastUpdated>20231012122128</lastUpdated>
 >>>>>>> snapshot
   </versioning>
 </metadata>
