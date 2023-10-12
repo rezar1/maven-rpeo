@@ -4,11 +4,17 @@
   <artifactId>ddd-akka-cluster-core</artifactId>
   <versioning>
 <<<<<<< HEAD
+<<<<<<< HEAD
     <release>0.0.1-RELEASE</release>
+=======
+    <release>0.0.2-RELEASE</release>
+>>>>>>> release
     <versions>
       <version>0.0.1-SNAPSHOT</version>
       <version>0.0.1-RELEASE</version>
+      <version>0.0.2-RELEASE</version>
     </versions>
+<<<<<<< HEAD
     <lastUpdated>20230927082110</lastUpdated>
 =======
     <versions>
@@ -20,5 +26,8 @@
 =======
     <lastUpdated>20231012122119</lastUpdated>
 >>>>>>> snapshot
+=======
+    <lastUpdated>20231012124109</lastUpdated>
+>>>>>>> release
   </versioning>
 </metadata>
