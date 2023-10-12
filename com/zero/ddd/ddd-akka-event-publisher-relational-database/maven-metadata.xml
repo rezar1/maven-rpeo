@@ -7,6 +7,7 @@
     <versions>
       <version>0.0.2-SNAPSHOT</version>
     </versions>
+<<<<<<< HEAD
     <lastUpdated>20231012122126</lastUpdated>
 =======
     <release>0.0.2-RELEASE</release>
@@ -15,5 +16,8 @@
     </versions>
     <lastUpdated>20231012124117</lastUpdated>
 >>>>>>> release
+=======
+    <lastUpdated>20231012162440</lastUpdated>
+>>>>>>> snapshot
   </versioning>
 </metadata>
