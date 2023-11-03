@@ -1,37 +1,820 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<metadata>
-  <groupId>com.zero.ddd</groupId>
-  <artifactId>ddd-akka-cluster-toolset</artifactId>
-  <versioning>
-<<<<<<< HEAD
-<<<<<<< HEAD
-    <release>0.0.1-RELEASE</release>
-=======
-    <release>0.0.2-RELEASE</release>
->>>>>>> release
-    <versions>
-      <version>0.0.1-SNAPSHOT</version>
-      <version>0.0.1-RELEASE</version>
-      <version>0.0.2-RELEASE</version>
-    </versions>
-<<<<<<< HEAD
-    <lastUpdated>20230927082114</lastUpdated>
-=======
-    <versions>
-      <version>0.0.2-SNAPSHOT</version>
-    </versions>
-<<<<<<< HEAD
-<<<<<<< HEAD
-    <lastUpdated>20231012121915</lastUpdated>
->>>>>>> snapshot
-=======
-    <lastUpdated>20231012122122</lastUpdated>
->>>>>>> snapshot
-=======
-    <lastUpdated>20231012124113</lastUpdated>
->>>>>>> release
-=======
-    <lastUpdated>20231012162435</lastUpdated>
->>>>>>> snapshot
-  </versioning>
-</metadata>
+# DDD领域驱动设计在中小型项目里的落地实现
+---
+
+
+@[TOC](文章目录)
+
+---
+
+# 前言
+对于现在交互模式的业务系统而言，普遍追求开发迭代效率高，系统自身的高可用等基础能力。解决方案之一便是引入微服务架构。通过业务拆分，服务冗余，请求分流，快速扩展等方式来满足以上要求。而具体微服务架构的设计，便可以基于DDD的指导思想来完成。
+
+DDD是一套设计方法，从大粒度的业务领域来看，DDD设计思想就像是两种代码设计原则的更广层次的推广(高内聚，低耦合/单一职责)，目的是识别拆分出职责不同的更小粒度的并且自身功能高度内聚的服务集合；从业务流转层面来说，强调的是业务之间的异步驱动和编排；从业务数据层面说，强调的是隔离和最终一致。
+
+简单说引入DDD架构具有以下几个好处：
+
+```java
+1. 开发方式更与现实情况契合，基于抽象化的领域知识，采用自顶向下的开发方式，专注于在领域模型内部完成现实概念的信息内聚，概念行为的内部表达。屏蔽底层库表设计以及避免数据存储方式带来的业务表达上的妥协(如挣扎于将对象的属性映射到表里并满足数据库的范式要求).
+
+2. 领域模型作为功能黑盒，只提供必要的输入输出同外界交互。概念边界清晰，高度自治，数据事务性冲突降低，易于团队聚焦开发和服务的中台化。
+
+3. 以事件驱动作为业务编排的重要途径，系统并行程度高，业务之间的耦合程度降低，可以简化一个复杂业务模型的开发步骤.
+
+4. 提供了各种设计约束和业务保障的方法论，有助于统一团队的开发风格和技术栈依赖.
+```
+本文不具体涉及DDD思想中所包含概念的详细说明，主要是通过👇这个具体项目来走一遍架构落地流程，抛个板砖引块玉。
+
+```java
+ 私域引流领域确定多引流渠道来源里单一用户的最早邀请链条关系
+
+ 引流渠道包括:
+	1. 企业微信群聊
+	2. 个人微信群聊
+	3. 小程序
+	4. 公众号
+
+ 渠道1,2 由第三方接口拉回群组成员信息; 3,4 由端上实时上报授权用户的访问信息
+【唯一用户】的归类基于昵称一致，头像相似度，地域一致，手动标记等方式完成
+ 用户邀请关系链条为员工引流业绩，商品售卖提供基础计算数据
+ 
+ 要求:
+ 	1. 实时构建用户所属的最早邀请链条
+ 	2. 邀请聊条构建过程中不影响当前实时链条数据的高频次查询
+ 	3. 服务集群高可用，能快速扩容以应对引流活动高峰的情况
+ 	4. 能追溯用户链条变更的生命周期日志
+
+ 项目基于以下技术栈开发:
+ 	1. springboot+jpa
+	2. kafka服务
+ 	3. redis服务+redisson
+	3. mysql8.0(作递归查询完整邀请链条)
+	4. 自研事件发布订阅中间件
+	5. 自研分布式任务调度中间件
+	
+ 自研部分主要目的有:
+	1. 服务自身内部便支持集群环境需要的功能，尽量减少架构落地所依赖部署的额外公共服务数量
+	2. 隔离依赖公用服务(消息队列，zk)的不同系统之间带来的级联性能影响，做到当前服务集群内部环境的闭合
+	3. 简化引入事件发布订阅/分布式任务调度等框架带来的业务入侵，以一种最简化的方式引入框架功能(springboot编程习惯)
+	4. 以多机分片+主从冗余的方式重写框架功能，保证框架功能在服务集群内部的高可用
+
+```
+[@see结构说明示例项目](https://gitee.com/Rezar/springboot-ddd-framework/tree/main/ddd-akka-event-publisher-demo)
+---
+# 一、DDD设计流程
+## 1. 设计流程
+
+领域驱动设计这一概念，可以从以下两点来理解
+1. 由业务涉及的领域知识驱动业务系统的设计
+2. 由业务系统产生的行为变更通知驱动不同业务系统完成自身的业务逻辑
+
+在战略设计阶段，强调的是高度的抽象，无需关心底层代码的具体实现及技术选型，先以一种产研测都能理解的图示标注方式表达出现实业务系统包含的领域概念，领域概念包含的信息，行为以及行为发生后可能需要驱动的后续操作。通过识别出完善的业务领域中的小粒度的领域概念并组织他们的关系来完成最终设计。
+后续便是基于DDD的战术设计要求，先设计出小粒度领域概念包含的聚合，实体，值对象，事件等成员类，这里强调的是【面向对象设计】，【自顶向下的开发方向】，【高度内聚】这几个原则，经验上来说包含
+
+```java
+1. 使用值对象封装标识类属性(业务主键或者其余领域概念实体的ID)，如公司ID(封装出CompanyId)，赋予属性明确的领域类型
+
+2. 封装有[数据变更原子性]要求的一批关联属性到单一值对象中
+
+3. 使用枚举类类型的值对象来表征各类状态
+
+4. 非必要的情况下忽略数据库一对多多对多的范式设计要求，以集合类型存储实体所必要的结构化信息
+
+5. 丰富实体的业务行为，将变更业务的操作入口控制在实体内部，对外屏蔽操作细节
+
+6. 丰富实体的通知事件类型，用于事件回溯实体生命周期及后续驱动其他业务流程
+
+7. 抽离单一职责的依赖外部信息的接口用于解耦
+
+8. 必要情况下实现【领域服务】用于编排聚合操作和防止外部输入带来的腐蚀
+```
+最终对外层提供服务的是聚合这一概念，包含丰富的业务属性信息以及完善的业务行为，并能通过调用行为引起聚合状态变更对外发出事件通知。
+
+[聚合边界划分的指导原则有](https://blog.csdn.net/u012179540/article/details/115152804):
+
+```java
+1. 生命周期一致(聚合内部的对象，应该和聚合根具有相同的生命周期，聚合根消失，则聚合内部的所有对象都应该一起消失)
+
+2. 问题域一致(不应该包含脱离当前领域模型还能存在的对象)
+
+3. 操作场景一致(对象操作频率的一致性)
+
+4. 适当的聚合大小
+```
+
+## 2. 微服务架构
+
+### 2.1 微服务间架构
+基于读写分离原则，邀请链条计算过程(计算资源消耗大)和链条查询(读操作频繁)做服务分离，以微服务单体间事件同步的方式同步数据，底层采用不同的数据库实例保证各自的读写性能，隔离业务之间性能差异带来的相互影响。
+即拆分为:
+	1. invitation_relationship_calc(计算项目)
+	2. invitation_relationship_query(查询项目)
+
+两个不同系统，分别多实例部署提供服务
+
+invitation_relationship_calc项目通过api接口上报，其余系统推送到消息队列消费的数据作为数据输入来源，输出不同来源聚合后【唯一用户】的邀请链归属关系。
+
+invitation_relationship_query项目输入邀请链归属关系，计算员工【引流报表】，【引流商品订单归属】等基础查询数据。
+
+### 2.2 微服务内分层
+DDD四层架构结构:
+1. 用户接口层(api-前端适配入口)
+2. 应用层(applications-聚合的事务性操作，业务编排等)
+3. 核心领域层(domain-核心业务操作)
+4. 基础设施层(infa-事件监听/数据库/网关/框架配置/解耦类接口实现/任务调度等各类基础依赖)
+
+项目包结构组织关系:
+![项目包结构组织关系](https://img-blog.csdnimg.cn/932bf4a68eb94b82aa5dfeb00276b71e.png)
+## 3. 聚合设计和业务流程编排
+	引流员工在不同引流来源下进行引流操作，如微信环境发布邀请链接，分享小程序卡片，埋点行为上报；群聊环境拉目标用户入群等操作。
+	微信环境包含用户的unionid标识，群聊环境包含用户的群成员ID标识，其余便是用户都包含的
+	【昵称】【头像】【位置】【父邀请人unionId/群成员ID】【被邀请时间】等信息。
+	
+	我们的目的是识别出不同来源下是同一个人的用户，并根据不同来源下被父级邀请的时间先后确定该用户准确的最早引流员工。
+	并且在当前用户的最早邀请员工发生变化时，需要实时更新当前用户以及被当前用户邀请的下级用户链条里所有人的归属员工信息。
+	最后实时同步到其他依赖这个基础数据的系统里用于查询计算。
+	
+	预设业务性能场景:
+		1. 普通微信环境的用户访问在引流活动高峰时期QPS可能在几千到几万的量级
+		2. 群聊用户数量在几千到几万的量级，且实时新入群用户QPS在几百到几千的量级
+		3. 实时邀请链条计算出的引流归属员工信息的查询QPS在千级别
+
+从业务描述中我们可以大致识别出:
+```haskell
+1. 不同来源下的用户概念
+	1. 普通微信环境
+	2. 群聊环境
+2. 合并不同来源用户信息的概念
+3. 群聊相关信息概念
+4. 发起引流活动的员工概念
+```
+基于此，我们可以大略组织出聚合包含的信息，但在继续设计详细聚合内部结构之前，需要考虑最开始提到的高性能和高峰处置能力，即以下两个思考问题:
+
+	1. 如何避免单一数据的并发修改冲突?
+	2. 如何做到高性能且实时构建每个用户所属的邀请链条?
+
+可以预想到的是，高峰时期，同一个来源下用户可能被不同的父邀请人邀请，同时群聊里同一用户会被不同的父邀请人拉进群聊。父邀请人自身的邀请关系也会实时变动。此时，单一来源下用户数据的并发修改，由不同来源合并出的【唯一用户】数据的并发修改，【唯一用户】参与的邀请链条的归属员工的计算和计算结果的更新导致的数据并发修改等情况会非常频繁。
+
+容易想到的解决方案是，数据并发修改这一块，我们可以通过数据库事务锁，分布式锁等方式控制并发修改；基于各种长期任务读取快照数据进行滞后性计算完成不同来源用户识别为【唯一用户】的合并过程和计算所有【唯一用户】的邀请链条；
+
+但这样的方案无法做到实时以及良好的性能，数据库事务锁有冲突和死锁的可能，并且很可能对数据库造成性能压力；合并不同来源用户/计算邀请链条归属需要加载全量数据，计算过程中内存资源消耗大且无法进行任务数据分治以多机执行分担压力；无法给其他业务提供准实时计算结果。
+
+此时按照DDD的指导思想我们可以通过【响应实时数据的变更】【排队对单一数据的并发修改请求】【避免对数据进行重量级加锁操作，并允许在数据冲突发生后有限次数重试修改操作】等方式来降低数据冲突风险和加速数据的处理过程。
+
+落地方案无外乎以下几种:
+	
+	1. 识别并隔离不同业务领域的数据关联
+	2. 在数据修改冲突较低的情况下使用乐观锁方式，重试失败操作
+	3. 任何聚合内部状态发生变化，实时发布必要的变更事件用以驱动其他业务流程的进行
+	4. 将对同一数据的修改请求分片到单一操作队列中(带有分区发布的消息队列/CQRS+EventSource模式)，不同数据的操作队列由可扩展的节点并行处理
+
+这里以具体流程示例来说明上面思考问题反映的实际情况和对应的解决方案
+### 3.1. 单来源下用户信息的处理流程
+基于业务描述可以识别出【普通微信环境下带unionid的用户】【群聊环境下带群成员ID的用户】两个概念，除了标识ID不一致外，其余信息字段都保持一致，我们可以抽象出【访问用户】这一领域模型，而通过上面对解决方案的讨论，我们首先可以通过【数据库乐观锁】的方式来处理单一【访问用户】的数据变更操作；接下来思考【访问用户】和其他领域模型的联系，我们最终目的是基于基础信息合并不同来源下的【访问用户】为【唯一用户】，并计算【唯一用户】的最早邀请关系。所以我们让【访问用户】在【【昵称】【头像】【地域】】等信息发生变化的时候发布变更事件出去，用于驱动【唯一用户】领域模型按规则寻找待合并的其他来源下的【访问用户】并进行数据合并。让【访问用户】内部保存最早父邀请人信息，并当最早父邀请人信息发生变化的时候，发布变更事件出去，用于驱动【唯一用户】领域模型比较更新多来源里真正的最早父邀请人信息。
+
+至此，我们可以设计出以下【访问用户】的聚合内部结构:
+```haskell
+1. 用户来源包含微信环境和群聊环境，将【环境类型】和【标识ID】二元数据构建为单一值对象作为主键标识(VisitorId)
+2. 用户【昵称】，【头像】，【地域】，【更新时间】多元数据需要被整体读写，设计为值对象(VisitorProfile)
+3. 用户当前最早【邀请人ID】【邀请时间】二元数据需要被整体读写，设计为值对象(VisitorFirstInviteBy)
+4. VisitorProfile基于【更新时间】判断是否需要更新，更新后发布用户基础信息变更的领域事件
+5. VisitorFirstInviteBy基于【邀请时间】先后判断是否需要更新，更新后发布用户最早邀请人变更的领域事件
+```
+示例代码如下:
+
+```java
+@Data
+@Entity
+@DynamicUpdate
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+@Table(
+        name = "visitor_user",
+        uniqueConstraints = {
+        		@UniqueConstraint(columnNames = { "taskId", "visitorId" })},
+        indexes = {
+        		@Index(columnList = "taskId,nickName")})
+public class Visitor extends IdentifiedEntity {
+	
+	private InviteTaskId taskId;
+	private VisitorId visitorId;
+	private VisitorProfile profile;
+	// 访客的最早邀请记录
+	private VisitorInviteBy visitorInviteBy;
+	
+	public Visitor(
+			InviteTaskId taskId,
+			VisitorId visitorId,
+			VisitorProfile profile) {
+		this.taskId = taskId;
+		this.visitorId = visitorId;
+		this.tryModifyVisitorProfile(profile);
+		DomainEventPublisher.publish(
+				new NewVisitor(
+						this.taskId,
+						this.visitorId,
+						this.profile));
+	}
+	
+	/**
+	 * 更新邀请记录
+	 * 
+	 * @param visitorInviteBy
+	 */
+	public void newInvitation(
+			VisitorInviteBy visitorInviteBy) {
+		// 自身邀请，忽略
+		// 如果之前没有父邀请人，但现在有了条最早邀请比当前记录创建时间更早的邀请记录，忽略(避免循环邀请)
+		if (this.isSelfInvite(visitorInviteBy)
+				|| visitorInviteBy.getVisitTime().isAfter(this.createdAt())
+				|| visitorInviteBy.equals(this.visitorInviteBy)) {
+			return;
+		}
+		if (this.visitorInviteBy == null
+				|| this.visitorInviteBy.getVisitTime().isAfter(
+						visitorInviteBy.getVisitTime())) {
+			this.visitorInviteBy = visitorInviteBy;
+			// 发布用户最早邀请人变更的领域事件
+			DomainEventPublisher.publish(
+					new VisitorInviteByChanged(
+							this.taskId,
+							this.visitorId,
+							visitorInviteBy,
+							this.visitorNickName()));
+		}
+	}
+
+	public void tryModifyVisitorProfile(
+			VisitorProfile profile) {
+		// 忽略头像为空的
+		if (profile.imageNotValid()) {
+			return;
+		}
+		if (this.profile == null
+				|| (!this.profile.equals(profile) 
+						&& this.profile.isOldThan(profile)
+						&& this.profile.profileFromWayAcceptUpdate(
+								profile.profileFromWay()))) {
+			VisitorProfile oldProfile = this.profile;
+			this.profile = profile;
+			// 发布用户基础信息变更的领域事件
+			DomainEventPublisher.publish(
+					new VisitorProfileChanged(
+							this.taskId,
+							this.visitorId,
+							this.profile,
+							oldProfile));
+		}
+	}
+	
+	private String visitorNickName() {
+		String nickName = 
+				this.profile == null ? 
+						"" : this.profile.getNickName();
+		return nickName;
+	}
+	
+	private boolean isSelfInvite(
+			VisitorInviteBy visitorInviteBy) {
+		return visitorInviteBy != null 
+				&& this.visitorId.isEquals(visitorInviteBy.getInviterId());
+	}
+	
+	public LocalDateTime createdAt() {
+		return this.getCreatedAt().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+	}
+}
+```
+### 3.2. 小程序/公众号用户访问数据的处理流程
+业务高峰时期，通过小程序分享卡片，访问活动页面埋点上报的数据量会非常大。数据包含【邀请人信息】，【被邀请人信息】，【邀请详情】等信息，这些数据用于构建普通微信环境下的【访问用户】聚合。若在访问上报的接口处理流程里进行【访问用户】信息的创建/比较更新等操作无法满足上报接口的性能要求，为解耦上报与构建【访问用户】两个流程，我们可以将上报数据设计为【上报数据日志】领域模型，模型存储每一次上报的内容，并发布【日志创建】的领域事件。
+
+【上报数据日志】作为【访问用户】领域模型的输入，我们需要避免对同一unionId的【访问用户】的并发修改，所以我们引入分区消费的概念，即保证所属同一【被邀请人unionId】的【日志创建】事件由单一消费者消费，至此我们可以放心的在操作【访问用户】的数据时使用乐观锁机制。同时上报流程简化为存储一条日志记录，发布领域事件两个步骤。
+
+消费示例代码如下:
+
+```java
+	@EventSynchronizer(
+			partition = 30,
+			clientConcurrency = 10)
+	@ShardingKeyExpression(
+			el ="#event[inviteTaskId] + '-' + #event[wxUnionId]")
+	public void handleWxVisitReportLogAndUpdateVisitorUserInfo(
+			NewWxVisitReportLog newWxVisitReportLog) {
+		this.visitorApp.visitorNewInvation(
+				newWxVisitReportLog.getTaskId(), 
+				newWxVisitReportLog.getWxUnionId(),
+				newWxVisitReportLog.getVisitorProfile(),
+				newWxVisitReportLog.getInviterInfo());
+	}
+```
+
+### 3.3. 群聊环境下用户数据的处理流程
+引流活动创建时会同步在第三方服务商(如企业微信开放平台)那创建对应的群活动用于拉新，后续引流员工拉新的群聊成员数据通过接口获取回来，单次接口请求会分页返回全量的活动下入群的用户数据。同样群聊成员数据包含【群成员信息】，【父级群成员信息】，【邀请详情】等信息用于构建群聊环境下的【访问用户】聚合。
+
+这里从预设的业务性能场景里可知，群活动包含数量众多的单个群聊，同一个用户可能在不同群聊里由不同的人邀请入群，而且整个群活动下入群成员数量在几万的量级。
+
+所以这里面临的问题有:
+
+	1. 群聊数据以全量的方式请求，请求数据的过程如果做到高性能?
+	2. 数据接口不告知哪些是新加入的群成员，哪些群成员的昵称、头像等基础信息发生了变化
+
+我们的目的是尽快将群成员信息转换为【访问用户】的状态信息。
+	
+所以对于问题1
+	
+	我们引入分布式任务调度的概念，将同一群活动的分页数据获取过程分治到多线程乃至多实例节点上完成。
+	既可以加速数据获取的过程，减少单节点的性能压力，又能快速横向扩展任务节点适应业务的发展
+
+对于问题2
+	
+	如果我们不加区分的将每条成员数据传递到构建【访问用户】的处理流程中，相当于每一次拉群操作中，都需要对几万条【访问用户】的记录
+	进行创建和更新判断操作，此时由于引入了数据分治的并行处理过程，同一个【群成员ID】的【访问用户】在不同的群聊里并且由于不同群聊数据
+	被不同任务节点处理的情况下，就很容易导致对同一【访问用户】聚合的并发修改操作，进而影响拉群操作的性能。
+	所以这里我们可以考虑给群成员数据抽象出一个【群成员信息】的领域模型，以【【群聊ID】+ 【群成员ID】】为主键标识，单次拉群操作中，
+	基于这个主键获取到历史【群成员信息】，并和拉回的最新群聊成员信息进行比较判断，发布各类更新领域事件到【访客用户】领域里，
+	【访客用户】领域基于【群成员ID】的分区键进行分区消费，避免了直接对【群成员ID】标识的【访客用户】进行操作导致的数据冲突。
+
+以下是分布式任务调度的示例代码:
+
+```java
+	@DistributedJob(
+			jobShowName = "拉取群活动群成员",
+			jobExecuteType = JobExecuteType.MAP,
+			concurrency = 5,
+			jobScheduled = @JobScheduled(cron = "0 * * * * ?", initialDelay = 30000),
+			jobScheduleTimeout = 
+				@JobScheduleTimeout(
+						timeout = 4, 
+						timeoutUnit = TimeUnit.MINUTES, 
+						timeoutListener = ErrorReportJobScheduleTimeoutBySMSListener.class))
+	public TaskResult pullGroupMembers(
+			JobTaskContext context) {
+		if (context.isRootTask()) {
+			// 初始根任务
+			return this.rootMapSubPullTask(TASK_TYPE.SubPullTaskType);
+		} else if (context.isTaskOfType(TASK_TYPE.SubPullTaskType.name())) {
+			// 二级实际执行的任务
+			PullPageRequest pullPageRequest = 
+					context.task(PullPageRequest.class);
+			return TaskResult.succ(
+					subPullGrupMembersHandler.handle(pullPageRequest));
+		}
+		return TaskResult.succ();
+	}
+	
+```
+响应【群成员信息】领域事件的示例代码:
+
+```java
+	@EventSynchronizer(
+			partition = 30, 
+			clientConcurrency = 10)
+	@ShardingKeyExpression(
+			el ="#event[taskId] + '-' + #event[wxMemberId]")
+	public void groupMemberAsVisitorUser(
+			NewGroupMember newGroupMember,
+			GroupMemberProfileChanged groupMemberProfileChanged,
+			GroupMemberInGroupInfoChanged groupMemberInGroupInfoChanged) {
+		if (newGroupMember != null) {
+			GroupMemberProfile profile = newGroupMember.getProfile();
+			GroupMemberInviterInfo inviter = newGroupMember.inviter();
+			this.visitorApplication.visitorNewInvation(
+					newGroupMember.getTaskId(),
+					newGroupMember.getWxMemberId().asVisitorId(), 
+					new VisitorProfile(
+							profile.getNickName(), 
+							profile.getHeadImageUrl(),
+							inviter.getInviteTime()),
+					inviter.getInviterWxMemberId().asVisitorId(),
+					inviter.getInviteTime());
+		} else if (groupMemberProfileChanged != null) {
+			GroupMemberProfile profile = 
+					groupMemberProfileChanged.getProfile();
+			this.visitorApplication.tryUpdateVisitorProfile(
+					groupMemberProfileChanged.getTaskId(),
+					groupMemberProfileChanged.getWxMemberId().asVisitorId(),
+					new VisitorProfile(
+							profile.getNickName(), 
+							profile.getHeadImageUrl(),
+							groupMemberProfileChanged.getProfileUpdatedAt()));
+		} else if (groupMemberInGroupInfoChanged != null) {
+			GroupMemberInviterInfo inviter = 
+					groupMemberInGroupInfoChanged.inviter();
+			this.visitorApplication.visitorNewInvation( 
+					groupMemberInGroupInfoChanged.getTaskId(), 
+					groupMemberInGroupInfoChanged.getWxMemberId().asVisitorId(), 
+					inviter.getInviterWxMemberId().asVisitorId(), 
+					inviter.getInviteTime());
+		}
+	}
+```
+### 3.4. 【唯一用户】概念的数据处理流程
+【唯一用户】是按照一定的匹配规则，合并不同引流来源下【访问用户】的信息得到的，这个领域模型较为复杂。
+
+1. 我们首先需要考虑的是如何实时合并不同来源的【访问用户】的数据，并尽量避免数据冲突的情况。合并的基础是昵称一致，头像相似等，而数据来源则是之前讨论过的不同来源下【访问用户】聚合状态变更发布的领域事件，那么我们很容易想到，以【昵称】作为分区键，将相同昵称的【访问用户】产生的变更事件交由单一消费节点消费，这样就能大大降低用户合并过程中，不同来源下的【访问用户】记录相互尝试合并对方导致的数据冲突问题。
+2. 其次便是当【唯一用户】在某个来源下的基础信息发生变化时，我们可能需要基于更新后的【昵称】【头像】等基础信息，重试1的合并流程，这里就涉及到合并拆分的情况。
+3. 处理完合并逻辑识别出【唯一用户】之后，便需要考虑邀请链计算的问题。这个地方的难点在于，邀请链中的每个人都处于实时变化的过程中，比如说A邀请了B，B邀请了C，我们在基于A计算B，C的归属员工时，有可能B的父邀请人变成了D，那我们基于A往下追溯的邀请链计算出的结果就不准确了。对于这种数据并发操作的，我们的解决方案还是拆分数据至小粒度再对小粒度数据的【操作串行化】。我们考虑现实情况，大部分普通用户能邀请到的好友量级和链条层级都不会很大，而且基于最早时间算有效邀请的原则，一段时间之前计算好的邀请链条几乎不会再发生变化，导致邀请链条变更的原因几乎是通过多级邀请进来的最新用户导致的关系变更，至此我们可以考虑将单个引流活动下邀请链条的计算过程串行化。*我们在【唯一用户】内部保存该用户在不同来源下比较得出的【最早父邀请人】信息，并在这一信息发生变更的时候，发布【最早邀请人变更】的领域事件，作为驱动邀请链条计算的数据来源。*处理领域事件的地方，我们取状态变更的【唯一用户】目前的父邀请人所归属的员工，作为当前【唯一用户】及【唯一用户】所处邀请链条下层的其他人的归属员工，然后进行归属员工信息的更新。
+4. 读写分离模式下，信息合并/邀请链条归属的计算结果都需要通过事件同步到其他业务系统里(EventSource模式)。其他业务系统在重建【唯一用户】状态的时候，可以基于唯一标识ID作为分区键，避免重建过程中的数据冲突。所以这里我们可以给【唯一用户】定义一个UUID唯一值的业务主键标识。
+
+基于以上几点思考，我们完成了【唯一用户】领域模型的大部分知识的整理。至此我们可以得出以下聚合的设计:
+```haskell
+1. UUID生成的唯一值作为【唯一用户】的业务主键，设计为值对象(ParticipantsId)
+2. 用户【昵称】，【头像】，【地域】，【更新时间】多元数据需要被整体读写，设计为值对象(ParticipantsProfile)
+3. 用户当前最早【邀请人ID】【邀请时间】二元数据需要被整体读写，设计为值对象(ParticipantsInviterInfo)
+4. 基于邀请链关系计算得到的归属员工信息设计为值对象(ParticipantsBelongTo)
+5. 在合并拆分场景下，我们需要保留不同来源下的用户基础信息，我们使用集合类型Map<VisitorSource, ParticipantsProfile>记录结构化的信息，使用自定义的jpa规范里的转换注解在实际落库的时候，将结构化数据序列化为json存储到varchar字段中
+6. ParticipantsProfile/ParticipantsInviterInfo变更时发布领域事件
+7. 比较更新基础信息的内部行为/比较更新最早父邀请人信息的内部行为(详见示例代码)
+```
+聚合设计示例代码:
+
+```java
+@Data
+@Entity
+@DynamicUpdate
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+@Table(
+        name = "participants_user_info",
+        uniqueConstraints = {
+        		@UniqueConstraint(columnNames = { "participantsId" })},
+        indexes = {
+        		@Index(columnList = "taskId,nickName")})
+public class ParticipantsInfo extends IdentifiedEntity {
+	
+	private static final Comparator<ParticipantsProfile> PROFILE_LAST_TIME_COMPARATOR = Comparator.comparing(ParticipantsProfile::getAcquisitionTime).reversed();
+	
+	private ParticipantsId participantsId;
+	private InviteTaskId taskId;
+	private ParticipantsInviterInfo inviterInfo;
+	private ParticipantsProfile profile;
+	private ParticipantsBelongTo belongTo;
+	// 不同来源下的原始信息
+	@Column(columnDefinition = "varchar(512)")
+	@Convert(converter = InviterInfoMap2JsonConveter.class)
+	private Map<VisitorSource, ParticipantsInviterInfo> sourceInviterInfo;
+	@Column(columnDefinition = "varchar(1024)")
+	@Convert(converter = ParticipantsProfileMap2JsonConveter.class)
+	private Map<VisitorSource, ParticipantsProfile> sourceParticipantsProfile;
+	
+	public ParticipantsInfo(
+			ParticipantsId participantsId,
+			InviteTaskId taskId) {
+		this.participantsId = participantsId;
+		this.taskId = taskId;
+	}
+	
+	/**
+	 * 尝试合并指定的用户
+	 * @param visitorId 
+	 * @param curProfile 
+	 * 
+	 * @param belongTo
+	 * @param participantsId2 
+	 */
+	public void tryMerge(
+			VisitorId visitorId, 
+			InviterInfo inviterInfo,
+			ParticipantsProfile curProfile,
+			ParticipantsId mergedParticipantsId) {
+		this.appendVisitorId(visitorId);
+		if (inviterInfo != null) {
+			this.updateInviterInfo(
+					visitorId.getVisitorSource(), 
+					inviterInfo);
+		}
+		if (curProfile != null) {
+			this.updateProfile(
+					visitorId.getVisitorSource(), 
+					curProfile);
+		}
+		DomainEventPublisher.publish(
+				new ParticipantsMerged(
+						this.participantsId,
+						this.taskId,
+						this.inviterInfo,
+						mergedParticipantsId,
+						LocalDateTime.now()));
+	}
+	
+	// 更新【唯一用户】父邀请人的行为
+	public void updateInviterInfo(
+			VisitorSource visitorSource, 
+			InviterInfo inviterInfo) {
+		this.updateVisitorSourceInviterInfo(
+				visitorSource,
+				inviterInfo);
+		this.reCompareFirstInivterInfo();
+	}
+
+	// 更新【唯一用户】基于邀请链条计算得到的归属信息行为
+	public void updateBelongTo(
+			ParticipantsBelongTo belongTo) {
+		if ((this.belongTo == null)
+				|| (this.belongTo != null && !this.belongTo.equals(belongTo))) {
+			this.belongTo = belongTo;
+			DomainEventPublisher.publish(
+					new ParticipantsBelongToChanged(
+							participantsId, 
+							taskId, 
+							belongTo));
+		}
+	}
+
+	// 更新【唯一用户】基础信息的行为
+	public void updateProfile(
+			VisitorSource visitorSource, 
+			ParticipantsProfile profile) {
+		boolean isFromEmpWay = 
+				profile.isProfileChangeFromEmpWay();
+		boolean profileHasChange =
+				this.updateSourceParticipantsProfile(
+						visitorSource,
+						profile);
+		if (profileHasChange) {
+			boolean matchSideNeedQuit = 
+					this.hasMatched() && isFromEmpWay;
+			if (matchSideNeedQuit) {
+				this.matchSideQuitMapping(
+						visitorSource,
+						profile.toNormalWay());
+			}
+			ParticipantsProfile reChooseProfile = this.reChooseProfile();
+			if (this.profile == null
+					|| matchSideNeedQuit
+					|| !this.profile.profileMaybeSame(reChooseProfile)) {
+				this.profile = reChooseProfile;
+				DomainEventPublisher.publish(
+						new ParticipantsProfileChanged(
+								this.participantsId,
+								this.taskId,
+								this.profile));
+			}
+		}
+	}
+
+	private ParticipantsProfile reChooseProfile() {
+		return this.sourceParticipantsProfile()
+				.values()
+				.stream()
+				.sorted(PROFILE_LAST_TIME_COMPARATOR)
+				.limit(1)
+				.findFirst()
+				.orElse(this.profile);
+	}
+
+	private boolean updateSourceParticipantsProfile(
+			VisitorSource visitorSource, 
+			ParticipantsProfile profile) {
+		ParticipantsProfile preValue = 
+				this.sourceParticipantsProfile()
+				.put(
+						visitorSource, 
+						profile);
+		return preValue == null || !preValue.profileMaybeSame(profile);
+	}
+
+	private Map<VisitorSource, ParticipantsProfile> sourceParticipantsProfile() {
+		if (this.sourceParticipantsProfile == null) {
+			this.sourceParticipantsProfile = 
+					Maps.newHashMapWithExpectedSize(2);
+		}
+		return this.sourceParticipantsProfile;
+	}
+
+	private void matchSideQuitMapping(
+			VisitorSource visitorSource, 
+			ParticipantsProfile quitSideProfile) {
+		VisitorId quitSideVisitorId = null;
+		if (visitorSource == VisitorSource.PV) {
+			quitSideVisitorId = this.wxUnionId.asVisitorId();
+			this.resetWxUnionId();
+		} else if (visitorSource == VisitorSource.GROUP) {
+			quitSideVisitorId = this.wxMemberId.asVisitorId();
+			this.resetWxMemberId();
+		} else {
+			return;
+		}
+		this.removeVisitorSourceProfile(visitorSource);
+		InviterInfo quitSideInviterInfo =
+				this.removeVisitorSourceInviterInfo(visitorSource);
+		this.reCompareFirstInivterInfo();
+		DomainEventPublisher.publish(
+				new ParticipantsMatchSideQuit(
+						this.taskId,
+						quitSideVisitorId,
+						quitSideProfile,
+						quitSideInviterInfo));
+	}
+
+	private void removeVisitorTypeSourceProfile(
+			VisitorSource visitorSource) {
+		this.sourceParticipantsProfile().remove(visitorSource);
+	}
+
+	public boolean maybeSame(
+			ParticipantsProfile profile) {
+		return this.profile.profileMaybeSame(profile);
+	}
+
+	private void reCompareFirstInivterInfo() {
+		InviterInfo compareFirsInviterInfo = 
+				this.compareFirstInviterInfo();
+		if (this.inviterInfo == null
+				|| !this.inviterInfo.equals(compareFirsInviterInfo)) {
+			this.inviterInfo = compareFirsInviterInfo;
+			DomainEventPublisher.publish(
+					new ParticipantsInviterInfoChanged(
+							this.participantsId,
+							this.taskId,
+							this.wxUnionId,
+							this.wxMemberId,
+							this.inviterInfo));
+		}
+	}
+	
+	private void updateVisitorSourceInviterInfo(
+			VisitorSource visitorType, 
+			InviterInfo inviterInfo) {
+		if (visitorSource == null) {
+			return;
+		}
+		Map<VisitorSource, InviterInfo> sourceBelongToCache = this.sourceInviterInfoCache();
+		if (sourceBelongToCache.containsKey(visitorSource)) {
+			sourceBelongToCache.compute(
+					visitorSource, 
+					(key, old) -> {
+						return old.isBefore(
+								inviterInfo.getInviteTime()) ? old : inviterInfo;
+			});
+		} else {
+			sourceBelongToCache.put(visitorSource, inviterInfo);
+		}
+	}
+	
+	private InviterInfo compareFirstInviterInfo() {
+		return 
+				this.sourceInviterInfoCache()
+				.entrySet()
+				.stream()
+				.map(Entry::getValue)
+				.sorted(Comparator.comparing(InviterInfo::getInviteTime))
+				.findFirst()
+				.orElse(null);
+	}
+
+	private InviterInfo removeVisitorSourceInviterInfo(
+			VisitorSource visitorSource) {
+		return this.sourceInviterInfoCache().remove(visitorSource);
+	}
+	
+	public void appendVisitorId(
+			VisitorId visitorId) {
+		if (visitorId.getVisitorSource() == VisitorSource.GROUP) {
+			this.tryAppendWxMemberId(
+					visitorId.asWxMemberId());
+		} else if(visitorId.getVisitorSource() == VisitorSource.PV) {
+			this.tryAppendWxUnionId(
+					visitorId.asWxUnionId());
+		}
+	}
+
+	private void tryAppendWxUnionId(
+			WxUnionId wxUnionId) {
+		if (wxUnionId == null) {
+			return;
+		}
+		if (this.wxUnionId == null
+				|| !this.wxUnionId.equals(wxUnionId)) {
+			this.wxUnionId = wxUnionId;
+			this.notifyVisitorIdChanged();
+		}
+	}
+
+	private void tryAppendWxMemberId(
+			WxMemberId wxMemberId) {
+		if (wxMemberId == null) {
+			return;
+		}
+		if (this.wxMemberId == null
+				|| !this.wxMemberId.equals(wxMemberId)) {
+			this.wxMemberId = wxMemberId;
+			this.notifyVisitorIdChanged();
+		}
+	}
+	
+	private void resetWxUnionId() {
+		WxUnionId preWxUnionId = this.wxUnionId;
+		this.wxUnionId = null;
+		DomainEventPublisher.publish(
+				new ParticipantsWxUnionIdReseted(
+						this.participantsId,
+						this.taskId,
+						this.wxMemberId,
+						preWxUnionId));
+		this.notifyVisitorIdChanged();
+	}
+	
+	private void resetWxMemberId() {
+		WxMemberId preWxMemberId = this.wxMemberId;
+		this.wxMemberId = null;
+		DomainEventPublisher.publish(
+				new ParticipantsWxMemberIdReseted(
+						this.participantsId,
+						this.taskId,
+						this.wxUnionId,
+						preWxMemberId));
+		this.notifyVisitorIdChanged();
+	}
+
+	private void notifyVisitorIdChanged() {
+		DomainEventPublisher.publish(
+				new ParticipantsMatchedVisitorIdChanged(
+						this.participantsId,
+						this.taskId,
+						this.wxUnionId,
+						this.wxMemberId));
+	}
+
+}
+```
+串行处理邀请链条计算的事件消费示例代码:
+
+```java
+ 
+ 	// 基于mysql8.0+支持的递归查询可以快速获取以当前【唯一用户】为起点的邀请链条信息
+	@EventSynchronizer(
+			partition = 30, 
+			clientConcurrency = 10)
+	@ShardingKeyExpression(
+			// 控制单一引流活动下邀请链条计算操作的串行化
+			el ="#event[taskId]")
+	public void updateParticipantsBelongChain(
+			ParticipantsInviterInfoChanged participantsInviterInfoChanged) {
+		String traceId = UUID.randomUUID().toString();
+		this.app.listAllInvitedChain(
+				participantsInviterInfoChanged.getParticipantsId())
+		.stream()
+		.forEach(tryUpdateInvitedPar -> {
+			log.info(
+					"[{}] pk:{} inviterId:{}, belongTo:{}", 
+					traceId,
+					tryUpdateInvitedPar.getPkId(),
+					tryUpdateInvitedPar.getInviterId(),
+					tryUpdateInvitedPar.getBelongTo());
+			this.app.juedgeAndUpdateParticipantsBelongTo(
+					tryUpdateInvitedPar.getPkId(),
+					tryUpdateInvitedPar.getInviterId(),
+					tryUpdateInvitedPar.belongToInfo());
+		});
+	}
+```
+
+## 4. 小总结
+我们可以简单整理出一份业务领域模型之间事件编排的关系图，用于业务领域知识的说明和存档:
+![在这里插入图片描述](https://img-blog.csdnimg.cn/7fdb45ce1072496ca4400dc2f08156b9.png)
+
+# 二、基础依赖-集群内部事件发布订阅
+从上面的内容可以看出，领域事件是DDD架构里的一等公民，可以通过领域事件来编排解耦不同的业务，以最终一致的方式同步数据，削峰串行处理数据，通过事件日志追溯聚合状态变更的生命周期等。
+在基础依赖层里，我们需要引入真正的发布订阅功能。很容易想到的便是基于消息队列来完成，目前市面上流行的消息队列产品有Kafka, ActivtyMQ, RabbitMQ等。这里以完整引入kafka框架来实现事件发布订阅功能的流程作为实例，并以部署和开发过程中的一些【问题】来解释为什么需要重复造一个【事件发布订阅】的轮子。
+
+```java
+1. 部署
+	kafka高可用的基础首先是集群化，数据分区，主从副本集等高可用架构都依赖于集群环境。
+	而同时，kafka还需基于zookeeper实现集群协调，leader选举，配置管理和消费组管理等功能，所以在部署kafka实例之前，需要提前部署好zookeeper集群。
+	我们可以看到，要落地基础的事件发布订阅功能，在部署这一步就需要消耗较多的机器资源。
+	对于中小型项目而言，一方面追求快速部署，另一方面就是可用资源较为紧张，依赖服务占用的资源多了，用于项目部署的资源就会减少。
+
+2. kafka服务管理
+	如果kafka集群作为一个公共服务使用，势必需要对其进行监控和异常告警。比如节点存活，机器内存磁盘cpu压力等基础指标。
+	除此之外，还需要考虑公共服务里不同业务的隔离问题，不同业务系统可能有不同的消费主题及不同的消费场景，
+	Kafka不同的消费主题的消费速率差异大可能会影响整个集群的稳定性，如消费速率快的可能会更多的占用网络带宽，磁盘IO，造成资源使用不均衡；
+	消费速率慢的可能会导致集群事件积压，消耗集群过多的内存空间进而影响其他业务的事件消费。
+	尽管可以通过调整分区数量，增加消费节点等方式来调优这类问题，但这类操作大多滞后于问题的发生。
+
+3. 开发
+	1. 	kafka无论在发布还是订阅的时候都需要明确知道目标主题的标识名称，并需要提前创建好(或者通过动态主题的方式创建)。
+		这就需要我们每次在发布订阅领域事件的时候，指定好对应的主题。
+		在主题不细分的时候，我们可能会以当前领域服务名称创建主题用于本系统内所有聚合事件发布，然后所有需要消费这个领域服务的系统都监听这个主题。
+		这个时候我们就要考虑到【Kafka同一条消息只能被同一个消费组下的某一个消费者消费】，通过为每个消费系统指定唯一消费组，
+		然后全量获取所有领域事件再按事件类型分发给不同的本地处理方法进行消费。
+		在这个过程中，一是kafka消费组是个重量级概念，过多创建会消耗更多的机器资源；再就是事件投递粒度较大，可能有些业务系统只关注一两个领域事件类型，
+		却需要订阅获取全量的事件数据，在某一类型事件量级较大的情况下，势必会对其他类型的事件消费造成影响。
+		最后基于这种方式没法合理的设置分区数以满足不同消费逻辑的性能要求。
+	2.	我们会基于kafka消息事务来保证事件发送的准确和幂等，通过预提交，本地业务事务执行结果来控制事件事务的提交和回滚，RabbitMQ在此基础上
+		还增加了本地事务执行结果查询的回调入口。但本质上为了保证kafaka事件发送和本地业务事务强一致的提交或者回滚，还是使用了分布式事务的模式。
+		而且发布过程存在失败的风险(Broker宕机或者副本集写入失败或者zookeeper宕机等)。本地业务的执行和软件硬件的性能耦合在了一起。
+```
+通过以上几点的说明，我们希望在中小型项目里能做到
+
+	1. 部署服务依赖简单，尽量减少资源的占用
+	2. 业务系统之间做到隔离，避免经由公共服务扩散造成的级联影响
+	3. 发布流程简单，有轻量级事务保障，支持分区消费，事件内容过滤
+	4. 高可用(做到自动故障转移)
+# 三、基础依赖-分布式任务调度
+
+# 总结
+
