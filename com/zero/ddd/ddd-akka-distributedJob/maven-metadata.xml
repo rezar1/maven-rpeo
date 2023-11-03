@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.zero.ddd</groupId>
+  <artifactId>ddd-akka-distributedJob</artifactId>
+  <versioning>
+    <versions>
+      <version>0.0.4-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20231103164423</lastUpdated>
+  </versioning>
+</metadata>
