@@ -3,9 +3,11 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-cluster-toolset</artifactId>
   <versioning>
+    <release>0.0.3-SNATSHOT</release>
     <versions>
       <version>0.0.2-SNAPSHOT</version>
+      <version>0.0.3-SNATSHOT</version>
     </versions>
-    <lastUpdated>20231012162435</lastUpdated>
+    <lastUpdated>20231103101930</lastUpdated>
   </versioning>
 </metadata>
