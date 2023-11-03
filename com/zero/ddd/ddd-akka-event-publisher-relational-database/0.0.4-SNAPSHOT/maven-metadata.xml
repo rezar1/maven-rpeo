@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>com.zero.ddd</groupId>
+  <artifactId>ddd-akka-event-publisher-relational-database</artifactId>
+  <version>0.0.4-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <timestamp>20231103.114707</timestamp>
+      <buildNumber>1</buildNumber>
+    </snapshot>
+    <lastUpdated>20231103114707</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>0.0.4-20231103.114707-1</value>
+        <updated>20231103114707</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>0.0.4-20231103.114707-1</value>
+        <updated>20231103114707</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>
