@@ -5,6 +5,7 @@
   <versioning>
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     <release>0.0.1-RELEASE</release>
 =======
     <release>0.0.2-RELEASE</release>
@@ -17,9 +18,14 @@
 <<<<<<< HEAD
     <lastUpdated>20230927082110</lastUpdated>
 =======
+=======
+    <release>0.0.3-SNATSHOT</release>
+>>>>>>> snapshot
     <versions>
       <version>0.0.2-SNAPSHOT</version>
+      <version>0.0.3-SNATSHOT</version>
     </versions>
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     <lastUpdated>20231012121911</lastUpdated>
@@ -32,6 +38,9 @@
 >>>>>>> release
 =======
     <lastUpdated>20231012162430</lastUpdated>
+>>>>>>> snapshot
+=======
+    <lastUpdated>20231103101926</lastUpdated>
 >>>>>>> snapshot
   </versioning>
 </metadata>

@@ -4,9 +4,15 @@
   <artifactId>ddd-helper</artifactId>
   <versioning>
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    <release>0.0.3-SNATSHOT</release>
+>>>>>>> snapshot
     <versions>
       <version>0.0.2-SNAPSHOT</version>
+      <version>0.0.3-SNATSHOT</version>
     </versions>
+<<<<<<< HEAD
 <<<<<<< HEAD
     <lastUpdated>20231012122111</lastUpdated>
 =======
@@ -18,6 +24,9 @@
 >>>>>>> release
 =======
     <lastUpdated>20231012162422</lastUpdated>
+>>>>>>> snapshot
+=======
+    <lastUpdated>20231103101918</lastUpdated>
 >>>>>>> snapshot
   </versioning>
 </metadata>

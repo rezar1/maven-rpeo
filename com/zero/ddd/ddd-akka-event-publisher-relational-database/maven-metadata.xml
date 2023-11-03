@@ -4,9 +4,15 @@
   <artifactId>ddd-akka-event-publisher-relational-database</artifactId>
   <versioning>
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+    <release>0.0.3-SNATSHOT</release>
+>>>>>>> snapshot
     <versions>
       <version>0.0.2-SNAPSHOT</version>
+      <version>0.0.3-SNATSHOT</version>
     </versions>
+<<<<<<< HEAD
 <<<<<<< HEAD
     <lastUpdated>20231012122126</lastUpdated>
 =======
@@ -18,6 +24,9 @@
 >>>>>>> release
 =======
     <lastUpdated>20231012162440</lastUpdated>
+>>>>>>> snapshot
+=======
+    <lastUpdated>20231103101934</lastUpdated>
 >>>>>>> snapshot
   </versioning>
 </metadata>
