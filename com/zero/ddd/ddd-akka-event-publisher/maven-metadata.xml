@@ -3,11 +3,12 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-event-publisher</artifactId>
   <versioning>
-    <release>0.0.2-RELEASE</release>
+    <release>0.0.4-RELEASE</release>
     <versions>
       <version>0.0.1-RELEASE</version>
       <version>0.0.2-RELEASE</version>
+      <version>0.0.4-RELEASE</version>
     </versions>
-    <lastUpdated>20231012124116</lastUpdated>
+    <lastUpdated>20231108084046</lastUpdated>
   </versioning>
 </metadata>
