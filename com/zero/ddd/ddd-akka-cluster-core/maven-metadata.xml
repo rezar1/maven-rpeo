@@ -3,14 +3,15 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-cluster-core</artifactId>
   <versioning>
-    <release>0.0.5-RELEASE</release>
+    <release>0.0.6-RELEASE</release>
     <versions>
       <version>0.0.1-SNAPSHOT</version>
       <version>0.0.1-RELEASE</version>
       <version>0.0.2-RELEASE</version>
       <version>0.0.4-RELEASE</version>
       <version>0.0.5-RELEASE</version>
+      <version>0.0.6-RELEASE</version>
     </versions>
-    <lastUpdated>20231120091210</lastUpdated>
+    <lastUpdated>20231207090302</lastUpdated>
   </versioning>
 </metadata>
