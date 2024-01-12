@@ -3,12 +3,13 @@
   <groupId>com.zero.ddd</groupId>
   <artifactId>ddd-akka-distributedJob</artifactId>
   <versioning>
-    <release>0.0.6-RELEASE</release>
+    <release>0.0.6.1-RELEASE</release>
     <versions>
       <version>0.0.4-RELEASE</version>
       <version>0.0.5-RELEASE</version>
       <version>0.0.6-RELEASE</version>
+      <version>0.0.6.1-RELEASE</version>
     </versions>
-    <lastUpdated>20231218092539</lastUpdated>
+    <lastUpdated>20240112095057</lastUpdated>
   </versioning>
 </metadata>
